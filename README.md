@@ -4,6 +4,8 @@
 #### OCaml and Haskell implementations of a basic Monte Carlo pathtracer
 #### Inspired by CIS 460, 120, and 194 at UPenn
 
+###### *CIS 194 TAs: for project details, click [here](https://docs.google.com/a/seas.upenn.edu/document/d/1xLXaz8hV7pzBwYbcIp04d8HkLUa8vT8k9gHSY8i5WNc/edit?usp=sharing)*
+
 ### What is it?
 > Path tracing is a computer graphics Monte Carlo method of rendering images of three-dimensional scenes such that the global illumination is faithful to reality. Fundamentally, the algorithm is integrating over all the illuminance arriving to a single point on the surface of an object.
 

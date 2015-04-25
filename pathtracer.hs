@@ -1,5 +1,5 @@
 import Data.List
-import Control.Monad (replicateM, liftM)
+import Control.Monad (replicateM, liftM, forM_)
 import System.Random
 import qualified Data.Vector.Mutable as V
 import Text.Printf
@@ -20,7 +20,10 @@ maxD :: Integer
 maxD = 5
 
 clamp :: (Num a, Ord a) => a -> a
-clamp x = if x > 1 then 1 else if x < 0 then 0 else x
+clamp x
+    | x > 1 = 1
+    | x < 0 = 0
+    | otherwise = x
 
 color :: Float -> Float -> Float -> (Int, Int, Int)
 color r g b = 
@@ -29,13 +32,13 @@ color r g b =
      floor $ clamp b ** (1 / 2.2) * 255 + 0.5)
 
 rand :: IO Float
-rand = liftM (\l -> l!!0) (replicateM 1 (randomIO :: IO Float))
+rand = liftM (!!0) (replicateM 1 (randomIO :: IO Float))
 
 (***) :: Float -> Vec -> Vec
 (***) c (Vec x y z) = Vec (c * x) (c * y) (c * z)
 
 norm :: Vec -> Vec
-norm (Vec x y z) = (1 / sqrt (x * x + y * y + z * z)) *** (Vec x y z)
+norm (Vec x y z) = (1 / sqrt (x * x + y * y + z * z)) *** Vec x y z
 
 (.>) :: Vec -> Vec -> Float
 (.>) (Vec x y z) (Vec x' y' z') = x * x' + y * y' + z * z'
@@ -53,13 +56,14 @@ instance Num Vec where (+) (Vec a b c) (Vec x y z)=Vec (a+x) (b+y) (c+z)
                        fromInteger = const (Vec 0 0 0)
 
 (-@-) :: Ray -> Sphere -> Maybe Float
-(-@-) (Ray o d) (Sphere r p e c rf) =
-    if (dt < 0) then Nothing
-    else if b - (sqrt dt) > epsilon then Just (b - sqrt dt)
-         else if b + (sqrt dt) > epsilon then Just (b + sqrt dt) else Nothing
-       where op = p - o
-             b = op .> d
-             dt = b * b - op .> op + r * r
+(-@-) (Ray o d) (Sphere r p e c rf)
+    | dt < 0 = Nothing
+    | b - sqrt dt > epsilon = Just (b - sqrt dt)
+    | b + sqrt dt > epsilon = Just (b + sqrt dt)
+    | otherwise = Nothing
+    where op = p - o
+          b = op .> d
+          dt = b * b - op .> op + r * r
 infixl 6 -@-
 
 shoot :: Ray -> (Maybe Float, Sphere)
@@ -99,7 +103,7 @@ getDiff nl e x dep' f = do
       u = norm $ (if abs wx > 0.1 then Vec 0 1 0 else Vec 1 0 0) >< nl
       v = nl >< u
       d' = norm $ ((cos r1 * r2s) *** u) + ((sin r1 * r2s) *** v) +
-           ((sqrt (1 - r2)) *** nl)
+           sqrt (1 - r2) *** nl
   fmap ((+) e . (*) f) (rad (Ray x d') dep')
 
 getSpec :: Vec -> Vec -> Integer -> Vec -> Vec -> Vec -> IO Vec
@@ -141,35 +145,35 @@ getRefr d n f dep' x e nl = do
                          rad1 <- fmap (\r -> tr *** r) (rad (Ray x tdir) dep')
                          return $ rad0 + rad1
                        )
-  if cos2t < 0 then fmap ((+) e . (*) f) (rad rfRay dep')
-  else fmap ((+) e . (*) f) reflOrRefr
+  fmap ((+) e . (*) f)
+           (if cos2t < 0 then rad rfRay dep' else reflOrRefr)
 
 rad :: Ray -> Integer -> IO Vec
 rad ray dep = 
     case shoot ray of
       (Nothing, _) -> return $ Vec 0 0 0
-      (Just t, Sphere r p e c rf) -> do
-                     if dep' < maxD then bounceWith c else
-                         rand >>= \er -> if (er < pr)
-                                         then bounceWith $ (1 / pr) *** c
-                                         else return e
-                             where
-                               Ray o d = ray
-                               x = o + (t *** d)
-                               n = norm $ x - p
-                               maxV (Vec r g b) = maximum [r,g,b]
-                               nl = if (n .> d < 0) then n else -n
-                               dep' = dep + 1
-                               pr = maxV c
-                               bounceWith f =
-                                   case rf of
-                                     Diff -> getDiff nl e x dep' f
-                                     Spec -> getSpec n d dep' f e x
-                                     Refr -> getRefr d n f dep' x e nl
+      (Just t, Sphere r p e c rf) ->
+          if dep' < maxD then bounceWith c else
+              rand >>= \er -> if er < pr
+                              then bounceWith $ (1 / pr) *** c
+                              else return e
+                  where
+                    Ray o d = ray
+                    x = o + (t *** d)
+                    n = norm $ x - p
+                    maxV (Vec r g b) = maximum [r,g,b]
+                    nl = if n .> d < 0 then n else -n
+                    dep' = dep + 1
+                    pr = maxV c
+                    bounceWith f =
+                        case rf of
+                          Diff -> getDiff nl e x dep' f
+                          Spec -> getSpec n d dep' f e x
+                          Refr -> getRefr d n f dep' x e nl
 
 mHelp1 sx sy cx cy x y w h c i samps dir pos = do
   r <- newIORef (Vec 0 0 0)
-  flip mapM_ [0..samps - 1] $ \s -> do
+  forM_ [0..samps - 1] $ \s -> do
            r1 <- fmap (2*) rand
            r2 <- fmap (2*) rand
            let dx = if r1 < 1 then sqrt r1 - 1 else 1 - sqrt (2 - r1)
@@ -183,13 +187,13 @@ mHelp1 sx sy cx cy x y w h c i samps dir pos = do
            modifyIORef r (+ ((1 / fromIntegral samps) *** rad'))
   ci <- V.unsafeRead c i
   Vec rr rg rb <- readIORef r
-  V.unsafeWrite c i $ ci + (0.25 *** (Vec (clamp rr) (clamp rg) (clamp rb)))
+  V.unsafeWrite c i $ ci + 0.25 *** Vec (clamp rr) (clamp rg) (clamp rb)
 
 mHelp2 cx cy x y w h c samps dir pos = do
   let i = (h - y - 1) * w + x
-  flip mapM_ [0..1] $ \sy -> do
-           flip mapM_ [0..1] $ \sx ->
-               mHelp1 sx sy cx cy x y w h c i samps dir pos
+  forM_ [0..1] $ \sy ->
+      forM_ [0..1] $ \sx ->
+          mHelp1 sx sy cx cy x y w h c i samps dir pos
 
 main = do
   let w = 100 :: Int
@@ -198,15 +202,15 @@ main = do
       pos = Vec 50 52 295.6
       dir = norm $ Vec 0 (-0.042612) (-1)
       cx = Vec (fromIntegral w * 0.5135 / fromIntegral h) 0 0
-      cy = 0.5135 *** (norm (cx >< dir))
+      cy = 0.5135 *** norm (cx >< dir)
   c <- V.replicate (w * h) (Vec 0 0 0)
   -- apply colors to the image
-  flip mapM_ [0..h-1] $ \y -> do
-         flip mapM_ [0..w-1] $ \x ->
-             mHelp2 cx cy x y w h c samps dir pos
+  forM_ [0..h-1] $ \y -> 
+      forM_ [0..w-1] $ \x ->
+          mHelp2 cx cy x y w h c samps dir pos
   -- print out path traced image
   printf "P3\n%d %d\n%d\n" w h (255 :: Int)
-  flip mapM_ [0..w * h - 1] $ \i -> do
+  forM_ [0..w * h - 1] $ \i -> do
          Vec r g b <- V.unsafeRead c i
          let (r', g', b') = color r g b
          printf "%d %d %d " r' g' b'
