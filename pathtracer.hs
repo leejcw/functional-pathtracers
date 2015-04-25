@@ -103,8 +103,9 @@ getDiff nl e x dep' f = do
   fmap ((+) e . (*) f) (rad (Ray x d') dep')
 
 getSpec :: Vec -> Vec -> Integer -> Vec -> Vec -> Vec -> IO Vec
-getSpec n d dep' f e x = let d' = d - ((2 * n .> d) *** n) in
-                         fmap ((+) e . (*) f) (rad (Ray x d') dep')
+getSpec n d dep' f e x =
+    let d' = d - ((2 * (n .> d)) *** n) in
+    fmap ((+) e . (*) f) (rad (Ray x d') dep')
 
 getRefr :: Vec -> Vec -> Vec -> Integer -> Vec -> Vec -> Vec -> IO Vec
 getRefr d n f dep' x e nl = do
