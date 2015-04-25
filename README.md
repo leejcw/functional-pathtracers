@@ -18,8 +18,8 @@ The concept of pathtracing is mostly recursive, and simply iterated over a two d
 Take a look at the samples:
 
  1. [animation.gif](https://github.com/leejcw/functional-pathtracers/blob/master/output/animation.gif) (OCaml) *post-processed in C to denoise with a small Gaussian kernel and compress*
- 2. [example.png](https://github.com/leejcw/functional-pathtracers/blob/master/output/example.png) (OCaml) and [example-hs.png](https://github.com/leejcw/functional-pathtracers/blob/master/output/example-hs.png) (Haskell)
- 3. [green.gif](https://github.com/leejcw/functional-pathtracers/blob/master/output/green.gif) (OCaml) *note the OCaml division by zero artifact*
+ 2. [example.png](https://github.com/leejcw/functional-pathtracers/blob/master/output/example.png) (OCaml) and [example-hs.png](https://github.com/leejcw/functional-pathtracers/blob/master/output/example-hs.png) (Haskell) *note the OCaml division by zero artifact*
+ 3. [green.gif](https://github.com/leejcw/functional-pathtracers/blob/master/output/green.gif) (OCaml)
  4. [pathtr.png](https://github.com/leejcw/functional-pathtracers/blob/master/output/pathtr.png) (Haskell)
  5. [specular.png](https://github.com/leejcw/functional-pathtracers/blob/master/output/specular.png) (OCaml)
 
