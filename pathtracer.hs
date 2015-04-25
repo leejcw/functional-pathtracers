@@ -38,7 +38,9 @@ rand = liftM (!!0) (replicateM 1 (randomIO :: IO Float))
 (***) c (Vec x y z) = Vec (c * x) (c * y) (c * z)
 
 norm :: Vec -> Vec
-norm (Vec x y z) = (1 / sqrt (x * x + y * y + z * z)) *** Vec x y z
+norm (Vec x y z) = 
+    if x == 0 && y == 0 && z == 0 then Vec 0 0 0
+    else (1 / sqrt (x * x + y * y + z * z)) *** Vec x y z
 
 (.>) :: Vec -> Vec -> Float
 (.>) (Vec x y z) (Vec x' y' z') = x * x' + y * y' + z * z'
