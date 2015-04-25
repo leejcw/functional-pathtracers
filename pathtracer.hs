@@ -1,4 +1,5 @@
 import Data.List
+import Data.Functor ((<$>))
 import Control.Monad (replicateM, liftM, forM_)
 import System.Random
 import qualified Data.Vector.Mutable as V
@@ -98,7 +99,7 @@ spheres = [Sphere 1e5 (Vec (1e5 + 1) 40.8 81.6) (Vec 0 0 0)
 
 getDiff :: Vec -> Vec -> Vec -> Integer -> Vec -> IO Vec
 getDiff nl e x dep' f = do
-  r1 <- fmap ((2 * pi) *) rand
+  r1 <- ((2 * pi) *) <$> rand
   r2 <- rand
   let r2s = sqrt r2
       Vec wx _ _ = nl
@@ -106,12 +107,12 @@ getDiff nl e x dep' f = do
       v = nl >< u
       d' = norm $ ((cos r1 * r2s) *** u) + ((sin r1 * r2s) *** v) +
            sqrt (1 - r2) *** nl
-  fmap ((+) e . (*) f) (rad (Ray x d') dep')
+  ((+) e . (*) f) <$> rad (Ray x d') dep'
 
 getSpec :: Vec -> Vec -> Integer -> Vec -> Vec -> Vec -> IO Vec
 getSpec n d dep' f e x =
     let d' = d - ((2 * (n .> d)) *** n) in
-    fmap ((+) e . (*) f) (rad (Ray x d') dep')
+    ((+) e . (*) f) <$> rad (Ray x d') dep'
 
 getRefr :: Vec -> Vec -> Vec -> Integer -> Vec -> Vec -> Vec -> IO Vec
 getRefr d n f dep' x e nl = do
@@ -138,17 +139,16 @@ getRefr d n f dep' x e nl = do
       reflOrRefr = if dep > 2 then
                        (do
                          er <- rand
-                         if er < q then fmap (\r -> rp *** r) (rad rfRay dep')
-                         else fmap (\r ->  tp *** r) (rad (Ray x tdir) dep')
+                         if er < q then (***) rp <$> rad rfRay dep'
+                         else (***) tp  <$> rad (Ray x tdir) dep'
                        )
                    else
                        (do
-                         rad0 <- fmap (\r -> re *** r) (rad rfRay dep')
-                         rad1 <- fmap (\r -> tr *** r) (rad (Ray x tdir) dep')
+                         rad0 <- (***) re <$> rad rfRay dep'
+                         rad1 <- (***) tr <$> rad (Ray x tdir) dep'
                          return $ rad0 + rad1
                        )
-  fmap ((+) e . (*) f)
-           (if cos2t < 0 then rad rfRay dep' else reflOrRefr)
+  ((+) e . (*) f) <$> (if cos2t < 0 then rad rfRay dep' else reflOrRefr)
 
 rad :: Ray -> Integer -> IO Vec
 rad ray dep = 
@@ -173,11 +173,11 @@ rad ray dep =
                           Spec -> getSpec n d dep' f e x
                           Refr -> getRefr d n f dep' x e nl
 
-mHelp1 sx sy cx cy x y w h c i samps dir pos = do
+forSample sx sy cx cy x y w h c i samps dir pos = do
   r <- newIORef (Vec 0 0 0)
   forM_ [0..samps - 1] $ \s -> do
-           r1 <- fmap (2*) rand
-           r2 <- fmap (2*) rand
+           r1 <- (2*) <$> rand
+           r2 <- (2*) <$> rand
            let dx = if r1 < 1 then sqrt r1 - 1 else 1 - sqrt (2 - r1)
                dy = if r2 < 1 then sqrt r2 - 1 else 1 - sqrt (2 - r2)
                d = dir +
@@ -191,11 +191,11 @@ mHelp1 sx sy cx cy x y w h c i samps dir pos = do
   Vec rr rg rb <- readIORef r
   V.unsafeWrite c i $ ci + 0.25 *** Vec (clamp rr) (clamp rg) (clamp rb)
 
-mHelp2 cx cy x y w h c samps dir pos = do
+forPixel cx cy x y w h c samps dir pos = do
   let i = (h - y - 1) * w + x
   forM_ [0..1] $ \sy ->
       forM_ [0..1] $ \sx ->
-          mHelp1 sx sy cx cy x y w h c i samps dir pos
+          forSample sx sy cx cy x y w h c i samps dir pos
 
 main = do
   let w = 100 :: Int
@@ -209,7 +209,7 @@ main = do
   -- apply colors to the image
   forM_ [0..h-1] $ \y -> 
       forM_ [0..w-1] $ \x ->
-          mHelp2 cx cy x y w h c samps dir pos
+          forPixel cx cy x y w h c samps dir pos
   -- print out path traced image
   printf "P3\n%d %d\n%d\n" w h (255 :: Int)
   forM_ [0..w * h - 1] $ \i -> do
