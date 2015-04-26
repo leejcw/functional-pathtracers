@@ -99,12 +99,14 @@ spheres = [Sphere 1e5 (Vec (1e5 + 1) 40.8 81.6) (Vec 0 0 0)
           Sphere 16.5 (Vec 55 60 30) (Vec 0 0 0) (Vec 1 1 0.3) Diff,
           Sphere 600 (Vec 50 681.33 81.6) (Vec 12 12 12) (Vec 0 0 0) Diff]
 
-getConf :: [Char] -> IO [Sphere]
+getConf :: String -> IO [Sphere]
 getConf fp = if fp == "" then return spheres
              else do
                file <- readFile fp
-               let toRf r = if r == "Spec" then Spec
-                            else if r == "Refr" then Refr else Diff
+               let toRf r
+                       | r == "Spec" = Spec
+                       | r == "Refr" = Refr
+                       | otherwise = Diff
                    flts = map (map (\w -> read w :: Float) . take 10 . words) $
                           lines file
                    rfs = map (toRf . last . words) $ lines file
@@ -222,7 +224,7 @@ getOptions ops = do
   args <- ops
   return $ if length args < 3 then ([100, 100, 60], "")
          else ([read (args!!0), read (args!!1), read (args!!2)],
-               (if length args > 3 then args!!3 else ""))
+               if length args > 3 then args!!3 else "")
 
 main = do
   (opts, fp) <- getOptions getArgs
