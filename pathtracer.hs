@@ -97,8 +97,8 @@ spheres = [Sphere 1e5 (Vec (1e5 + 1) 40.8 81.6) (Vec 0 0 0)
           Sphere 16.5 (Vec 55 60 30) (Vec 0 0 0) (Vec 1 1 0.3) Diff,
           Sphere 600 (Vec 50 681.33 81.6) (Vec 12 12 12) (Vec 0 0 0) Diff]
 
-getDiff :: Vec -> Vec -> Vec -> Integer -> Vec -> IO Vec
-getDiff nl e x dep' f = do
+getDiff :: Vec -> Vec -> Vec -> Vec -> Integer -> IO Vec
+getDiff nl e x f dep' = do
   r1 <- ((2 * pi) *) <$> rand
   r2 <- rand
   let r2s = sqrt r2
@@ -109,13 +109,13 @@ getDiff nl e x dep' f = do
            sqrt (1 - r2) *** nl
   ((+) e . (*) f) <$> rad (Ray x d') dep'
 
-getSpec :: Vec -> Vec -> Integer -> Vec -> Vec -> Vec -> IO Vec
-getSpec n d dep' f e x =
+getSpec :: Vec -> Vec -> Vec -> Vec -> Vec -> Integer -> IO Vec
+getSpec n d e x f dep' =
     let d' = d - ((2 * (n .> d)) *** n) in
     ((+) e . (*) f) <$> rad (Ray x d') dep'
 
-getRefr :: Vec -> Vec -> Vec -> Integer -> Vec -> Vec -> Vec -> IO Vec
-getRefr d n f dep' x e nl = do
+getRefr :: Vec -> Vec -> Vec -> Vec -> Vec -> Vec -> Integer ->  IO Vec
+getRefr nl n d e x f dep' = do
   let rfRay = Ray x (d - (2 * n .> d) *** n)
       isInside = n .> nl > 0
       nt = 1
@@ -169,9 +169,9 @@ rad ray dep =
                     pr = maxV c
                     bounceWith f =
                         case rf of
-                          Diff -> getDiff nl e x dep' f
-                          Spec -> getSpec n d dep' f e x
-                          Refr -> getRefr d n f dep' x e nl
+                          Diff -> getDiff nl e x f dep'
+                          Spec -> getSpec n d e x f dep'
+                          Refr -> getRefr nl d n e x f dep'
 
 forSample sx sy cx cy x y w h c i samps dir pos = do
   r <- newIORef (Vec 0 0 0)
