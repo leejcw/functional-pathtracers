@@ -16,14 +16,20 @@ The concept of pathtracing is mostly recursive, and simply iterated over a two d
 Both the Haskell and OCaml versions provide a hardcoded scene  which will be rendered if no arguments are given. The two of them have slightly different command line arguments though.
 
  * OCaml: compile with **ocamlopt pathtracer.ml** and run with
-   1. ./a.out <width> <height> <samples>
-   2. ./a.out <width> <height> <output_file>
-   3. ./a.out <width> <height> <output_file> <config_file>
-   The default output_file is *ocaml.ppm*.
+   1. ./a.out *width height samples*
+   2. ./a.out *width height output-file*
+   3. ./a.out *width height output-file config-file*
+
+   The default output_file is **ocaml.ppm**.
  * Haskell: compile with **ghc -O2 pathtracer.hs** and run with
    1. ./pathtracer
-   2. ./pathtracer <width> <height> <samples>
-   The default width, height, and samples are 100, 100, and 60 respectively.
+   2. ./pathtracer *width height samples*
+   3. ./pathtracer *width height samples config-file*
+
+   The default width, height, and samples are 100, 100, and 60 respectively. The output is always written to **stdout**.
+
+To make your own configuration, each line represents a sphere. The lines should be formatted as such:
+##### radius centerX centerY centerZ emittedR emittedG emittedB colorR colorG colorB [Diff/Spec/Refr]
 
 ### Check it out!
 Take a look at the samples:

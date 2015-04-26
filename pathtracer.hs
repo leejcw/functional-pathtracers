@@ -71,8 +71,8 @@ instance Num Vec where (+) (Vec a b c) (Vec x y z)=Vec (a+x) (b+y) (c+z)
           dt = b * b - op .> op + r * r
 infixl 6 -@-
 
-shoot :: Ray -> (Maybe Float, Sphere)
-shoot ray = foldl' closest (Nothing, undefined) spheres where
+shoot :: Ray -> [Sphere] -> (Maybe Float, Sphere)
+shoot ray = foldl' closest (Nothing, undefined) where
     closest (i, sph) sph' = case (i, ray -@- sph') of
                               (Nothing, Just t) -> (Just t, sph')
                               (Just t', Just t) ->
@@ -99,8 +99,25 @@ spheres = [Sphere 1e5 (Vec (1e5 + 1) 40.8 81.6) (Vec 0 0 0)
           Sphere 16.5 (Vec 55 60 30) (Vec 0 0 0) (Vec 1 1 0.3) Diff,
           Sphere 600 (Vec 50 681.33 81.6) (Vec 12 12 12) (Vec 0 0 0) Diff]
 
-getDiff :: Vec -> Vec -> Vec -> Vec -> Integer -> IO Vec
-getDiff nl e x f dep' = do
+getConf :: [Char] -> IO [Sphere]
+getConf fp = if fp == "" then return spheres
+             else do
+               file <- readFile fp
+               let toRf r = if r == "Spec" then Spec
+                            else if r == "Refr" then Refr else Diff
+                   flts = map (map (\w -> read w :: Float) . take 10 . words) $
+                          lines file
+                   rfs = map (toRf . last . words) $ lines file
+                   sphs = map (\(fs, r) ->
+                               Sphere (fs!!0) (Vec (fs!!1) (fs!!2) (fs!!3))
+                                      (Vec (fs!!4) (fs!!5) (fs!!6))
+                                      (Vec (fs!!7) (fs!!8) (fs!!9)) r
+                              ) $ zip flts rfs
+               return sphs
+                 
+
+getDiff :: Vec -> Vec -> Vec -> Vec -> Integer -> [Sphere] -> IO Vec
+getDiff nl e x f dep' sphs = do
   r1 <- ((2 * pi) *) <$> rand
   r2 <- rand
   let r2s = sqrt r2
@@ -109,15 +126,16 @@ getDiff nl e x f dep' = do
       v = nl >< u
       d' = norm $ ((cos r1 * r2s) *** u) + ((sin r1 * r2s) *** v) +
            sqrt (1 - r2) *** nl
-  ((+) e . (*) f) <$> rad (Ray x d') dep'
+  ((+) e . (*) f) <$> rad (Ray x d') dep' sphs
 
-getSpec :: Vec -> Vec -> Vec -> Vec -> Vec -> Integer -> IO Vec
-getSpec n d e x f dep' =
+getSpec :: Vec -> Vec -> Vec -> Vec -> Vec -> Integer -> [Sphere] -> IO Vec
+getSpec n d e x f dep' sphs =
     let d' = d - ((2 * (n .> d)) *** n) in
-    ((+) e . (*) f) <$> rad (Ray x d') dep'
+    ((+) e . (*) f) <$> rad (Ray x d') dep' sphs
 
-getRefr :: Vec -> Vec -> Vec -> Vec -> Vec -> Vec -> Integer ->  IO Vec
-getRefr nl n d e x f dep' = do
+getRefr :: Vec -> Vec -> Vec -> Vec -> Vec -> Vec ->
+           Integer -> [Sphere] ->  IO Vec
+getRefr nl n d e x f dep' sphs = do
   let rfRay = Ray x (d - (2 * n .> d) *** n)
       isInside = n .> nl > 0
       nt = 1
@@ -141,20 +159,20 @@ getRefr nl n d e x f dep' = do
       reflOrRefr = if dep > 2 then
                        (do
                          er <- rand
-                         if er < q then (***) rp <$> rad rfRay dep'
-                         else (***) tp  <$> rad (Ray x tdir) dep'
+                         if er < q then (***) rp <$> rad rfRay dep' sphs
+                         else (***) tp  <$> rad (Ray x tdir) dep' sphs
                        )
                    else
                        (do
-                         rad0 <- (***) re <$> rad rfRay dep'
-                         rad1 <- (***) tr <$> rad (Ray x tdir) dep'
+                         rad0 <- (***) re <$> rad rfRay dep' sphs
+                         rad1 <- (***) tr <$> rad (Ray x tdir) dep' sphs
                          return $ rad0 + rad1
                        )
-  ((+) e . (*) f) <$> (if cos2t < 0 then rad rfRay dep' else reflOrRefr)
+  ((+) e . (*) f) <$> (if cos2t < 0 then rad rfRay dep' sphs else reflOrRefr)
 
-rad :: Ray -> Integer -> IO Vec
-rad ray dep = 
-    case shoot ray of
+rad :: Ray -> Integer -> [Sphere] -> IO Vec
+rad ray dep sphs = 
+    case shoot ray sphs of
       (Nothing, _) -> return $ Vec 0 0 0
       (Just t, Sphere r p e c rf) ->
           if dep' < maxD then bounceWith c else
@@ -171,11 +189,11 @@ rad ray dep =
                     pr = maxV c
                     bounceWith f =
                         case rf of
-                          Diff -> getDiff nl e x f dep'
-                          Spec -> getSpec n d e x f dep'
-                          Refr -> getRefr nl d n e x f dep'
+                          Diff -> getDiff nl e x f dep' sphs
+                          Spec -> getSpec n d e x f dep' sphs
+                          Refr -> getRefr nl d n e x f dep' sphs
 
-forSample sx sy cx cy x y w h c i samps dir pos = do
+forSample sx sy cx cy x y w h c i samps dir pos sphs = do
   r <- newIORef (Vec 0 0 0)
   forM_ [0..samps - 1] $ \s -> do
            r1 <- (2*) <$> rand
@@ -187,26 +205,27 @@ forSample sx sy cx cy x y w h c i samps dir pos = do
                      fromIntegral w - 0.5) *** cx) +
                    ((((sy + 0.5 + dy) / 2 + fromIntegral y) /
                      fromIntegral h - 0.5) *** cy)
-           rad' <- rad (Ray (pos + (140 *** d)) (norm d)) 0
+           rad' <- rad (Ray (pos + (140 *** d)) (norm d)) 0 sphs
            modifyIORef r (+ ((1 / fromIntegral samps) *** rad'))
   ci <- V.unsafeRead c i
   Vec rr rg rb <- readIORef r
   V.unsafeWrite c i $ ci + 0.25 *** Vec (clamp rr) (clamp rg) (clamp rb)
 
-forPixel cx cy x y w h c samps dir pos = do
+forPixel cx cy x y w h c samps dir pos sphs = do
   let i = (h - y - 1) * w + x
   forM_ [0..1] $ \sy ->
       forM_ [0..1] $ \sx ->
-          forSample sx sy cx cy x y w h c i samps dir pos
+          forSample sx sy cx cy x y w h c i samps dir pos sphs
 
-getOptions :: IO [String] -> IO [Int]
+getOptions :: IO [String] -> IO ([Int], String)
 getOptions ops = do
   args <- ops
-  return $ if length args /= 3 then [100, 100, 60]
-         else map (\arg -> read arg :: Int) args
+  return $ if length args < 3 then ([100, 100, 60], "")
+         else ([read (args!!0), read (args!!1), read (args!!2)],
+               (if length args > 3 then args!!3 else ""))
 
 main = do
-  opts <- getOptions getArgs
+  (opts, fp) <- getOptions getArgs
   let pos = Vec 50 52 295.6
       dir = norm $ Vec 0 (-0.042612) (-1)
       cx = Vec (fromIntegral w * 0.5135 / fromIntegral h) 0 0
@@ -214,11 +233,12 @@ main = do
       w = opts!!0
       h = opts!!1
       samps = opts!!2
+  sphs <- getConf fp
   c <- V.replicate (w * h) (Vec 0 0 0)
   -- apply colors to the image
   forM_ [0..h-1] $ \y -> 
       forM_ [0..w-1] $ \x ->
-          forPixel cx cy x y w h c samps dir pos
+          forPixel cx cy x y w h c samps dir pos sphs
   -- print out path traced image
   printf "P3\n%d %d\n%d\n" w h (255 :: Int)
   forM_ [0..w * h - 1] $ \i -> do
