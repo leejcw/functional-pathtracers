@@ -4,8 +4,6 @@
 #### OCaml and Haskell implementations of a basic Monte Carlo pathtracer
 #### Inspired by CIS 460, 120, and 194 at UPenn
 
-###### *CIS 194 TAs: for project details, click [here](https://docs.google.com/a/seas.upenn.edu/document/d/1xLXaz8hV7pzBwYbcIp04d8HkLUa8vT8k9gHSY8i5WNc/edit?usp=sharing)*
-
 ### What is it?
 > Path tracing is a computer graphics Monte Carlo method of rendering images of three-dimensional scenes such that the global illumination is faithful to reality. Fundamentally, the algorithm is integrating over all the illuminance arriving to a single point on the surface of an object.
 
@@ -13,6 +11,19 @@ The above definition is courtesy of Wikipedia, and does a very good job of summi
 
 ### Why functional?
 The concept of pathtracing is mostly recursive, and simply iterated over a two dimensional array of pixels, which lends itself nicely to functional programs. They usually are not written in languages such as OCaml or Haskell because these run many times slower than languages like C or C++, even with compiler optimizations. However, the functional implementation is arguably more elegant and easier to understand.
+
+### How To Use
+Both the Haskell and OCaml versions provide a hardcoded scene  which will be rendered if no arguments are given. The two of them have slightly different command line arguments though.
+
+ * OCaml: compile with **ocamlopt pathtracer.ml** and run with
+   1. ./a.out <width> <height> <samples>
+   2. ./a.out <width> <height> <output_file>
+   3. ./a.out <width> <height> <output_file> <config_file>
+   The default output_file is *ocaml.ppm*.
+ * Haskell: compile with **ghc -O2 pathtracer.hs** and run with
+   1. ./pathtracer
+   2. ./pathtracer <width> <height> <samples>
+   The default width, height, and samples are 100, 100, and 60 respectively.
 
 ### Check it out!
 Take a look at the samples:
@@ -25,6 +36,4 @@ Take a look at the samples:
 
 ### To Do
  * Artifacts in Haskell implementation due to non-uniform sampling
- * Allow a configuration file to be provided instead of a hard coded scene
- * Command line arguments for size and samples
  * Make it faster?

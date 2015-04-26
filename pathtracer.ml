@@ -60,32 +60,54 @@ object (self)
   method color = (c, rf)
 end
 
-(* Currently hard-coded scene
-   TODO: Change to parsing from config file. *)
-let spheres = [|
-  new sphere 1e5 ((1e5 +. 1.), 40.8, 81.6)
-    (0., 0., 0.) (0.75, 0.25, 0.25) Diff;
-  new sphere 1e5 ((-1e5 +. 99.), 40.8, 81.6)
-    (0., 0., 0.) (0.25, 0.25, 0.75) Diff;
-  new sphere 1e5 (50., 40.8, 1e5)
-    (0., 0., 0.) (0.75, 0.75, 0.75) Diff;
-  new sphere 1e5 (50., 40.8, (-1e5 +. 170.))
-    (0., 0., 0.) (0., 0., 0.) Diff;
-  new sphere 1e5 (50., 1e5, 81.6)
-    (0., 0., 0.) (0.75, 0.75, 0.75) Diff;
-  new sphere 1e5 (50., (-1e5 +. 81.6), 81.6)
-    (0., 0., 0.) (0.75, 0.75, 0.75) Diff;
-  new sphere 16.5 (27., 16.5, 47.)
-    (0., 0., 0.) (0.6, 0.6, 0.6) Spec;
-  new sphere 16.5 (73., 16.5, 78.)
-    (0., 0., 0.) (0.65, 0.5, 0.999) Refr;
-  new sphere 16.5 (55., 60., 30.)
-    (0., 0., 0.) (1., 1., 0.3) Diff;
-  new sphere 600. (50., 681.33, 81.6)
-    (12., 12., 12.) (0., 0., 0.) Diff
-	      |];;
+let read_config (config: string) =
+  let spheres = [|
+    new sphere 1e5 ((1e5 +. 1.), 40.8, 81.6)
+      (0., 0., 0.) (0.75, 0.25, 0.25) Diff;
+    new sphere 1e5 ((-1e5 +. 99.), 40.8, 81.6)
+      (0., 0., 0.) (0.25, 0.25, 0.75) Diff;
+    new sphere 1e5 (50., 40.8, 1e5)
+      (0., 0., 0.) (0.75, 0.75, 0.75) Diff;
+    new sphere 1e5 (50., 40.8, (-1e5 +. 170.))
+      (0., 0., 0.) (0., 0., 0.) Diff;
+    new sphere 1e5 (50., 1e5, 81.6)
+      (0., 0., 0.) (0.75, 0.75, 0.75) Diff;
+    new sphere 1e5 (50., (-1e5 +. 81.6), 81.6)
+      (0., 0., 0.) (0.75, 0.75, 0.75) Diff;
+    new sphere 16.5 (27., 16.5, 47.)
+      (0., 0., 0.) (0.6, 0.6, 0.6) Spec;
+    new sphere 16.5 (73., 16.5, 78.)
+      (0., 0., 0.) (0.65, 0.5, 0.999) Refr;
+    new sphere 16.5 (55., 60., 30.)
+      (0., 0., 0.) (1., 1., 0.3) Diff;
+    new sphere 600. (50., 681.33, 81.6)
+      (12., 12., 12.) (0., 0., 0.) Diff
+		|] in
+  let to_sphere line =
+    let (line', rf) = Scanf.sscanf line "%s %s %s %s %s %s %s %s %s %s %s" 
+      (fun s0 s1 s2 s3 s4 s5 s6 s7 s8 s9 s10 ->
+	([s0; s1; s2; s3; s4; s5; s6; s7; s8; s9], s10))
+    in
+    (* format is: radius cx cy cz er eg eb cr cg cb refl *)
+    let a = Array.of_list (List.map float_of_string line') in
+    let get_refl i = if i = "Spec" then Spec
+      else if i = "Refr" then Refr else Diff in
+    new sphere a.(0) (a.(1), a.(2), a.(3))
+      (a.(4), a.(5), a.(6)) (a.(7), a.(8), a.(9))
+      (get_refl rf) in
+  if config = "" then spheres
+  else
+    let lines = ref [] in
+    let file = open_in config in
+    try
+      while true; do
+	lines := input_line file :: !lines
+      done; spheres
+    with End_of_file ->
+      close_in file;
+      Array.of_list (List.map to_sphere !lines)
 
-let intersect (r: ray) : (float * int) =
+let intersect (r: ray) (spheres: sphere array) : (float * int) =
   let n = Array.length spheres in
   let t = ref 1.e20 in
   let id = ref (- 1) in
@@ -95,8 +117,8 @@ let intersect (r: ray) : (float * int) =
   done;
   !t, !id
 
-let rec radiance (r: ray) (d: int) : vec =
-  let (t, i) = intersect r in
+let rec radiance (r: ray) (d: int) (spheres: sphere array) : vec =
+  let (t, i) = intersect r spheres in
   if i < 0 then (0., 0., 0.) else
     begin
       let sph = spheres.(i) in
@@ -124,10 +146,11 @@ let rec radiance (r: ray) (d: int) : vec =
 		  ((cos o1 *. o2' |* u) ++ 
 		      (sin o1 *. o2' |* u') ++
 		      (sqrt (1. -. o2) |* n')) in
-		sph#em ++ (f *** radiance (v, u'') (d + 1))
+		sph#em ++ (f *** radiance (v, u'') (d + 1) spheres)
 	    | Spec ->
 	      sph#em ++ (f ***
-			   radiance (v, (rd -- (2. *. dot n rd |* n))) (d + 1))
+			   radiance (v, (rd -- (2. *. dot n rd |* n))) (d + 1)
+			   spheres)
 	    | Refr ->
 	      let rfr = (v, rd -- (2. *. dot n rd |* n)) in
 	      let i = dot n n' > 0. in
@@ -135,7 +158,8 @@ let rec radiance (r: ray) (d: int) : vec =
 	      let ir = if i then 1. /. ior else ior in
 	      let idd = dot rd n' in
 	      let c2t = 1. -. ir *. ir *. (1. -. idd *. idd) in
-	      if c2t < 0. then sph#em ++ (f *** radiance rfr (d + 1)) else
+	      if c2t < 0. then sph#em ++ (f *** radiance rfr (d + 1) spheres)
+	      else
 		begin
 		  let td = norm (ir |* rd -- ((if i then 1. else - 1.) *.
 						 idd *. ir *. sqrt c2t |* n))
@@ -153,19 +177,21 @@ let rec radiance (r: ray) (d: int) : vec =
 		  sph#em ++ (f *** (
 		    if d > 2 then
 		      begin
-			if Random.float 1. < p0 then p1 |* radiance rfr (d + 1)
-			else p2 |* radiance (v, td) (d + 1)
+			if Random.float 1. < p0 then p1 |*
+			    radiance rfr (d + 1) spheres
+			else p2 |* radiance (v, td) (d + 1) spheres
 		      end
 		    else
-		      r1 |* radiance rfr (d + 1) ++
-			  (r2 |* radiance (v, td) (d + 1))
+		      r1 |* radiance rfr (d + 1) spheres ++
+			  (r2 |* radiance (v, td) (d + 1) spheres)
 		  ))
 		end
 	  end
 	end
     end
       
-let draw (w: int) (h: int) (ss: int) (file_name: string) : unit =
+let draw (w: int) (h: int) (ss: int) (file_name: string) (config: string) =
+  let spheres = read_config config in
   let w' = float_of_int w in
   let h' = float_of_int h in
   let (co, cd) = ((50., 52., 295.6), norm (0., - 0.042612, - 1.)) in
@@ -195,7 +221,7 @@ let draw (w: int) (h: int) (ss: int) (file_name: string) : unit =
 		  ((((float_of_int sy +. 0.5 +. dy) /.
 			2. +. y') /. h' -. 0.5) |* cy) ++ cd in
 	    r :=  !r ++ ((1. /. float_of_int ss) |*
-		radiance (co ++ (140. |* d), norm d) 0);
+		radiance (co ++ (140. |* d), norm d) 0 spheres);
 	  done;
 	  let (rx, ry, rz) = !r in
 	  Array.set c i (c.(i) ++ (0.25 |* (clamp rx, clamp ry, clamp rz)));
@@ -213,15 +239,19 @@ let draw (w: int) (h: int) (ss: int) (file_name: string) : unit =
   close_out oc
 
 ;; if Array.length Sys.argv < 4 then
-    Printf.printf "Please run with ./a.out <width> <height> <samples> [file]\n"
+    Printf.printf
+"Please run with ./a.out <width> <height> <samples> [file] [config]\n"
   else
     try
       let w = int_of_string Sys.argv.(1) in
       let h = int_of_string Sys.argv.(2) in
       let s = int_of_string Sys.argv.(3) in
-      let f = 
+      let f = (
 	try (if Array.length Sys.argv > 4 then Sys.argv.(4) else "ocaml.ppm")
-	with _ -> "ocaml.ppm" in
-      draw w h s f
-    with _ -> Printf.printf "Invalid arguments given.
-              Please run with ./a.out <width> <height> <samples> [file] \n"
+	with _ -> "ocaml.ppm" ) in
+      let c = ( try (if Array.length Sys.argv > 5 then Sys.argv.(5) else "")
+	with _ -> "" ) in
+      draw w h s f c
+    with _ -> Printf.printf
+"Invalid arguments given.
+Please run with ./a.out <width> <height> <samples> [file] [config]\n"
