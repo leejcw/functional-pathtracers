@@ -165,7 +165,7 @@ let rec radiance (r: ray) (d: int) : vec =
 	end
     end
       
-let draw (w: int) (h: int) (ss: int) : unit =
+let draw (w: int) (h: int) (ss: int) (file_name: string) : unit =
   let w' = float_of_int w in
   let h' = float_of_int h in
   let (co, cd) = ((50., 52., 295.6), norm (0., - 0.042612, - 1.)) in
@@ -205,11 +205,23 @@ let draw (w: int) (h: int) (ss: int) : unit =
   done;
   let print_vec (o: out_channel) ((r, g, b): vec) : unit =
     Printf.fprintf o "%d %d %d " (rgb r) (rgb g) (rgb b) in
-  let oc = open_out "ocaml.ppm" in
+  let oc = open_out file_name in
   Printf.fprintf oc "P3\n%d %d\n255\n" w h;
   for i = 0 to (Array.length c - 1) do
     print_vec oc c.(i);
   done;
   close_out oc
-    
-;; draw 400 400 20 (* TODO: Read from config file. *)
+
+;; if Array.length Sys.argv < 4 then
+    Printf.printf "Please run with ./a.out <width> <height> <samples> [file]\n"
+  else
+    try
+      let w = int_of_string Sys.argv.(1) in
+      let h = int_of_string Sys.argv.(2) in
+      let s = int_of_string Sys.argv.(3) in
+      let f = 
+	try (if Array.length Sys.argv > 4 then Sys.argv.(4) else "ocaml.ppm")
+	with _ -> "ocaml.ppm" in
+      draw w h s f
+    with _ -> Printf.printf "Invalid arguments given.
+              Please run with ./a.out <width> <height> <samples> [file] \n"

@@ -5,6 +5,8 @@ import System.Random
 import qualified Data.Vector.Mutable as V
 import Text.Printf
 import Data.IORef
+import System.Environment
+import System.Exit
 
 data Vec = Vec !Float !Float !Float
          deriving (Show, Eq)
@@ -197,14 +199,21 @@ forPixel cx cy x y w h c samps dir pos = do
       forM_ [0..1] $ \sx ->
           forSample sx sy cx cy x y w h c i samps dir pos
 
+getOptions :: IO [String] -> IO [Int]
+getOptions ops = do
+  args <- ops
+  return $ if length args /= 3 then [100, 100, 60]
+         else map (\arg -> read arg :: Int) args
+
 main = do
-  let w = 100 :: Int
-      h = 100 :: Int
-      samps = 60
-      pos = Vec 50 52 295.6
+  opts <- getOptions getArgs
+  let pos = Vec 50 52 295.6
       dir = norm $ Vec 0 (-0.042612) (-1)
       cx = Vec (fromIntegral w * 0.5135 / fromIntegral h) 0 0
       cy = 0.5135 *** norm (cx >< dir)
+      w = opts!!0
+      h = opts!!1
+      samps = opts!!2
   c <- V.replicate (w * h) (Vec 0 0 0)
   -- apply colors to the image
   forM_ [0..h-1] $ \y -> 
